@@ -1,0 +1,11 @@
+{
+  "name": "vocabulary-bot",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Vocab Master Pro: Telegram Web App (frontend) + bot va eslatmalar (backend)",
+  "scripts": {
+    "install:backend": "npm --prefix backend/models/vmp-backen install",
+    "start": "npm --prefix backend/models/vmp-backen start",
+    "test": "npm --prefix backend/models/vmp-backen test"
+  }
+}

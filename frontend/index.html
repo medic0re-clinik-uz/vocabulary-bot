@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vocab Master Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- PARTICLES BACKGROUND -->
+<canvas id="particles-canvas"></canvas>
+
+<!-- ONBOARDING: PLACEMENT TEST -->
+<div id="onboarding-screen" class="fullscreen-center">
+    <div class="test-card animate__animated animate__zoomIn">
+        <div class="test-header">
+            <div class="test-logo">V<span>M</span>P</div>
+            <h2 class="neon-text">LEVEL TEST</h2>
+            <p class="sub-text">10 ta savol: test va yozma. Natijaga qarab aniq darajangiz belgilanadi.</p>
+        </div>
+        <div class="progress-wrap mb-4">
+            <div class="progress-track">
+                <div id="test-progress-bar" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <span id="test-counter" class="progress-label">0 / 10</span>
+        </div>
+        <div id="question-area">
+            <div class="question-meta">
+                <div class="question-level-badge" id="q-level-badge">A1</div>
+                <div class="question-type-badge" id="q-type-badge">Test</div>
+            </div>
+            <h3 id="question-text" class="question-text">Tayyormisiz?</h3>
+            <div id="question-sub" class="question-sub"></div>
+        </div>
+        <div id="test-options" class="options-grid"></div>
+        <div id="test-type-wrap" class="type-wrap" style="display:none">
+            <input type="text" id="test-input" class="spell-input" placeholder="Inglizcha yozing..." autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                   onkeydown="if(event.key==='Enter') submitTypedPlacement(false)">
+            <div id="test-hint" class="type-hint"></div>
+            <div class="type-actions">
+                <button id="test-check-btn" class="btn-main" onclick="submitTypedPlacement(false)"><i class="fas fa-check me-2"></i> Tekshirish</button>
+                <button id="test-skip-btn" class="btn-skip" onclick="submitTypedPlacement(true)">Bilmayman</button>
+            </div>
+        </div>
+        <div id="start-btn-wrap" class="text-center mt-4">
+            <button class="btn-neon-lg" onclick="startPlacementTest()">
+                <i class="fas fa-play me-2"></i> BOSHLASH
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" class="d-none">
+    <div class="app-container pb-nav pt-3">
+
+        <!-- ===== HOME TAB ===== -->
+        <section id="home" class="app-section animate__animated animate__fadeIn">
+
+            <!-- Welcome Header -->
+            <div class="home-header mb-3">
+                <div>
+                    <h2 class="neon-text-blue welcome-name" id="welcome-name">Xush kelibsiz!</h2>
+                    <p class="sub-text">Bugun o'rganish uchun ajoyib kun.</p>
+                </div>
+                <div class="level-badge-big" id="home-level-badge">A1</div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-row mb-4">
+                <div class="stat-chip" id="streak-chip">
+                    <i class="fas fa-fire"></i>
+                    <div>
+                        <div class="stat-val" id="streak-val">0</div>
+                        <div class="stat-lbl">Streak</div>
+                    </div>
+                </div>
+                <div class="stat-chip">
+                    <i class="fas fa-book-open"></i>
+                    <div>
+                        <div class="stat-val" id="total-words-val">0</div>
+                        <div class="stat-lbl">So'zlar</div>
+                    </div>
+                </div>
+                <div class="stat-chip">
+                    <i class="fas fa-trophy"></i>
+                    <div>
+                        <div class="stat-val" id="xp-val">0</div>
+                        <div class="stat-lbl">XP</div>
+                    </div>
+                </div>
+                <div class="stat-chip">
+                    <i class="fas fa-graduation-cap"></i>
+                    <div>
+                        <div class="stat-val" id="lessons-done-val">0</div>
+                        <div class="stat-lbl">Darslar</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Goal Section -->
+            <div class="section-card mb-3">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-bullseye me-2 text-warning"></i>Kunlik Maqsad</h5>
+                    <button class="btn-icon" onclick="openDailyGoalModal()"><i class="fas fa-cog"></i></button>
+                </div>
+                <div class="daily-goal-body">
+                    <div class="goal-info">
+                        <span id="goal-current">0</span>/<span id="goal-target">20</span> so'z
+                    </div>
+                    <div class="goal-bar-wrap">
+                        <div class="goal-bar-track">
+                            <div id="goal-progress-bar" class="goal-bar-fill" style="width:0%"></div>
+                        </div>
+                        <span id="goal-pct" class="goal-pct">0%</span>
+                    </div>
+                    <div id="goal-message" class="goal-message">🎯 Bugun maqsadingizga yeting!</div>
+                </div>
+            </div>
+
+            <!-- Word of the Day -->
+            <div class="section-card wotd-card mb-3" id="wotd-card">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-star me-2 text-warning"></i>Kunning So'zi</h5>
+                    <button class="btn-icon" onclick="playWordAudio()" id="audio-btn"><i class="fas fa-volume-up"></i></button>
+                </div>
+                <div class="wotd-body">
+                    <div class="wotd-word" id="wotd-word">Serendipity</div>
+                    <div class="wotd-phonetic" id="wotd-phonetic">/ˌser.ənˈdɪp.ɪ.ti/</div>
+                    <div class="wotd-translation" id="wotd-translation">Kutilmagan baxt</div>
+                    <div class="wotd-example" id="wotd-example">"Finding that book was pure serendipity."</div>
+                </div>
+            </div>
+
+            <!-- Idiom + Grammar Row -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="section-card h-100">
+                        <div class="mini-card-icon">💬</div>
+                        <div class="mini-card-title">Idiom</div>
+                        <div class="mini-card-content" id="idiom-text">Break the ice</div>
+                        <div class="mini-card-sub" id="idiom-meaning">Suhbatni boshlash</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="section-card h-100">
+                        <div class="mini-card-icon">📐</div>
+                        <div class="mini-card-title">Grammar Tip</div>
+                        <div class="mini-card-content small" id="grammar-tip">Present Perfect ishlatish...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Smart Repetition -->
+            <div class="section-card mb-3" id="spaced-rep-section">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-brain me-2 text-info"></i>Bugun Takrorlash Kerak</h5>
+                    <span class="badge-count" id="review-count">0</span>
+                </div>
+                <div id="review-words-list" class="review-list"></div>
+                <button class="btn-neon-sm w-100 mt-2" onclick="startQuickReview()" id="quick-review-btn">
+                    <i class="fas fa-bolt me-1"></i> 1 Daqiqalik Quick Review
+                </button>
+            </div>
+
+            <!-- Vocabulary Strength -->
+            <div class="section-card mb-3">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-chart-bar me-2 text-success"></i>Lug'at Kuchi</h5>
+                </div>
+                <div class="vocab-strength-body">
+                    <div class="vocab-meter-wrap">
+                        <div class="vocab-meter">
+                            <div id="vocab-strength-bar" class="vocab-meter-fill" style="width:0%"></div>
+                        </div>
+                        <span id="vocab-strength-pct" class="vocab-pct">0%</span>
+                    </div>
+                    <p id="vocab-strength-desc" class="vocab-desc">Kundalik suhbatning 0% ini tushuning</p>
+                </div>
+            </div>
+
+            <!-- Weekly Activity Graph -->
+            <div class="section-card mb-3">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-calendar-week me-2 text-purple"></i>Haftalik Faollik</h5>
+                </div>
+                <div class="weekly-graph" id="weekly-graph"></div>
+            </div>
+
+            <!-- Badges Gallery -->
+            <div class="section-card mb-3">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-medal me-2 text-warning"></i>Mening Medallaryim</h5>
+                </div>
+                <div class="badges-grid" id="badges-grid"></div>
+            </div>
+
+            <!-- Forgotten Words -->
+            <div class="section-card mb-3" id="forgotten-section">
+                <div class="section-card-header">
+                    <h5><i class="fas fa-times-circle me-2 text-danger"></i>Unutilgan So'zlar</h5>
+                    <span class="badge-count danger" id="forgotten-count">0</span>
+                </div>
+                <div id="forgotten-list" class="review-list"></div>
+            </div>
+
+        </section>
+
+        <!-- ===== LESSONS TAB ===== -->
+        <section id="lessons" class="app-section d-none animate__animated animate__fadeIn">
+            <div class="lessons-header">
+                <h2 class="neon-text text-center">O'quv Yo'li</h2>
+                <div class="level-selector-wrap">
+                    <select id="level-selector" class="level-select" onchange="renderLessons()">
+                        <option value="A1">A1 - Beginner</option>
+                        <option value="A2">A2 - Elementary</option>
+                        <option value="B1">B1 - Intermediate</option>
+                        <option value="B2">B2 - Upper-Intermediate</option>
+                        <option value="C1">C1 - Advanced</option>
+                        <option value="C2">C2 - Mastery</option>
+                    </select>
+                </div>
+            </div>
+            <div class="tree-container" id="lesson-tree"></div>
+        </section>
+
+        <!-- ===== PROFILE TAB ===== -->
+        <section id="profile" class="app-section d-none animate__animated animate__fadeIn">
+            <div class="profile-page">
+                <div class="profile-hero">
+                    <div class="avatar-ring">
+                        <div class="avatar-inner">
+                            <i class="fas fa-user-astronaut"></i>
+                        </div>
+                    </div>
+                    <h2 id="profile-name" class="neon-text-blue mt-3">O'quvchi</h2>
+                    <div class="level-pill" id="profile-level-pill">A1 · Beginner</div>
+                </div>
+
+                <div class="profile-stats-grid mb-4">
+                    <div class="profile-stat">
+                        <div class="ps-icon"><i class="fas fa-fire"></i></div>
+                        <div class="ps-val" id="ps-streak">0</div>
+                        <div class="ps-lbl">Streak</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="ps-icon"><i class="fas fa-star"></i></div>
+                        <div class="ps-val" id="ps-xp">0</div>
+                        <div class="ps-lbl">XP</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="ps-icon"><i class="fas fa-book"></i></div>
+                        <div class="ps-val" id="ps-words">0</div>
+                        <div class="ps-lbl">So'zlar</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="ps-icon"><i class="fas fa-check"></i></div>
+                        <div class="ps-val" id="ps-lessons">0</div>
+                        <div class="ps-lbl">Darslar</div>
+                    </div>
+                </div>
+
+                <div class="section-card mb-3">
+                    <h5 class="mb-3"><i class="fas fa-chart-line me-2 text-info"></i>Daraja Progressi</h5>
+                    <div id="level-progress-bars"></div>
+                </div>
+
+                <div class="section-card mb-3">
+                    <h5 class="mb-3"><i class="fas fa-cog me-2 text-muted"></i>Sozlamalar</h5>
+                    <div class="setting-row">
+                        <span>Kunlik Maqsad</span>
+                        <button class="btn-icon-sm" onclick="openDailyGoalModal()"><i class="fas fa-edit"></i></button>
+                    </div>
+                    <div class="setting-row">
+                        <span>Eslatmalar</span>
+                        <div class="toggle-switch" id="notif-toggle" onclick="toggleNotif()">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </div>
+                    <div class="setting-row danger-row" onclick="resetProgress()">
+                        <span><i class="fas fa-trash me-2"></i>Progressni tozalash</span>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <div class="section-card mb-3">
+                    <h5 class="mb-3"><i class="fas fa-medal me-2 text-warning"></i>Barcha Medallar</h5>
+                    <div class="badges-grid-full" id="profile-badges-grid"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav">
+        <button onclick="navTo('home')" class="nav-btn active" id="nav-home">
+            <div class="nav-icon"><i class="fas fa-home"></i></div>
+            <span>Asosiy</span>
+        </button>
+        <button onclick="navTo('lessons')" class="nav-btn" id="nav-lessons">
+            <div class="nav-icon"><i class="fas fa-route"></i></div>
+            <span>Darslar</span>
+        </button>
+        <button onclick="navTo('profile')" class="nav-btn" id="nav-profile">
+            <div class="nav-icon"><i class="fas fa-user"></i></div>
+            <span>Profil</span>
+        </button>
+    </nav>
+</div>
+
+<!-- LESSON GAME MODAL -->
+<div id="lesson-modal" class="modal-overlay d-none">
+    <div class="game-modal">
+        <div class="game-modal-header">
+            <div>
+                <h4 id="modal-lesson-title" class="m-0">Dars</h4>
+                <span id="modal-lesson-sub" class="modal-sub">O'yin 1/5</span>
+                <span id="lesson-memorized-label" style="display:block;font-size:13px;color:#8ef0d4;margin-top:6px">🌊 0% · 0/10 so'z yodlandi</span>
+            </div>
+            <button class="close-btn" onclick="closeLesson()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="game-progress-wrap">
+            <div class="game-progress-track">
+                <div id="game-progress-bar" class="game-progress-fill" style="width:0%"></div>
+            </div>
+            <span id="game-progress-label">0%</span>
+        </div>
+        <div class="game-hearts">
+            <span id="heart1" class="heart">❤️</span>
+            <span id="heart2" class="heart">❤️</span>
+            <span id="heart3" class="heart">❤️</span>
+        </div>
+        <div id="modal-content-area" class="game-content-area"></div>
+    </div>
+</div>
+
+<!-- QUICK REVIEW MODAL -->
+<div id="quick-review-modal" class="modal-overlay d-none">
+    <div class="game-modal">
+        <div class="game-modal-header">
+            <div>
+                <h4 class="m-0">⚡ Quick Review</h4>
+                <span class="modal-sub">1 daqiqalik quiz</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="timer-display" id="review-timer">60</div>
+                <button class="close-btn" onclick="closeQuickReview()"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div id="quick-review-content" class="game-content-area"></div>
+    </div>
+</div>
+
+<!-- DAILY GOAL MODAL -->
+<div id="daily-goal-modal" class="modal-overlay d-none">
+    <div class="small-modal">
+        <h4 class="neon-text mb-4">Kunlik Maqsad</h4>
+        <p class="text-muted mb-3">Kuniga nechta so'z o'rganmoqchisiz?</p>
+        <div class="goal-options">
+            <button class="goal-opt" onclick="setDailyGoal(10)">10</button>
+            <button class="goal-opt" onclick="setDailyGoal(20)">20</button>
+            <button class="goal-opt" onclick="setDailyGoal(30)">30</button>
+            <button class="goal-opt" onclick="setDailyGoal(50)">50</button>
+        </div>
+        <button class="btn-outline-cancel mt-3 w-100" onclick="closeDailyGoalModal()">Bekor qilish</button>
+    </div>
+</div>
+
+<script src="words.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

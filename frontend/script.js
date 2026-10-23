@@ -85,7 +85,7 @@ function saveData() {
 // Backend manzilini o'zgartirish uchun faqat shu qatorni tahrirlang (bo'sh qoldirsangiz o'chadi).
 // Sayt backend orqali (http://localhost:10000) ochilsa, o'sha serverning o'ziga ulanadi;
 // Netlify / GitHub Pages dan ochilsa — quyidagi Render manziliga.
-const DEPLOYED_BACKEND_URL = "https://vmp-backend-1.onrender.com";
+const DEPLOYED_BACKEND_URL = "https://vocabulary-bot-kaxm.onrender.com";
 const BACKEND_URL = (/^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1)$/.test(location.hostname))
     ? location.origin
     : DEPLOYED_BACKEND_URL;

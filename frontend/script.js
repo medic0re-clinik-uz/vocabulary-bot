@@ -356,7 +356,7 @@ function finalizePlacement() {
             <div class="pl-level-name">${LEVEL_NAMES[level]}</div>
             <div class="pl-line">${correct}/10 to'g'ri javob · ${totalPlacementScore} ball</div>
             <div class="pl-list">${rows}</div>
-            <div class="pl-note">Siz ${level} darajadan boshlaysiz. Istalgan vaqtda boshqa darajadagi darslarni ham ochishingiz mumkin.</div>
+            <div class="pl-note">Siz ${level} darajadan boshlaysiz. Boshqa darajalar siz joriy darajani tugatgandan keyin ochiladi.</div>
         </div>`,
         background: '#111118',
         color: '#fff',
@@ -642,7 +642,27 @@ function updateHomeUI() {
 const LEVEL_ICONS = { A1: '🌱', A2: '🌿', B1: '⭐', B2: '💫', C1: '🔥', C2: '💎' };
 const LEVEL_COLORS = { A1: '#00ff88', A2: '#00d9ff', B1: '#b060ff', B2: '#ff6b35', C1: '#ff4088', C2: '#ffd700' };
 
+// Daraja tugaganmi (hamma darsi bajarilganmi)?
+function levelCompleted(l) {
+    return countLevelLessons(userData, l) >= WORD_BANK[l].length;
+}
+// Faqat joriy daraja va allaqachon tugatilgan darajalar ochiq
+function isLevelAccessible(l) {
+    return l === (userData.level || 'A1') || levelCompleted(l);
+}
+function updateLevelSelector() {
+    const selector = document.getElementById('level-selector');
+    if (!selector) return;
+    Array.from(selector.options).forEach(o => {
+        const ok = isLevelAccessible(o.value);
+        o.disabled = !ok;
+        o.textContent = (ok ? '' : '🔒 ') + o.textContent.replace(/^🔒\s*/, '');
+    });
+    if (!isLevelAccessible(selector.value)) selector.value = userData.level || 'A1';
+}
+
 function renderLessons() {
+    updateLevelSelector();
     const selector = document.getElementById('level-selector');
     const level = selector ? selector.value : (userData.level || 'A1');
     const tree = document.getElementById('lesson-tree');
@@ -687,8 +707,6 @@ function renderLessons() {
         node.style.animationDelay = (i * 25) + 'ms';
         node.classList.add('animate__animated', 'animate__fadeIn');
         tree.appendChild(node);
-
-        if (i >= unlockedUpTo + 4 && !isComplete) break;
     }
 
     if (unlockedUpTo >= lessonCount) {
@@ -703,6 +721,11 @@ function renderLessons() {
 let currentLesson = { level: null, index: null, words: [], gamePhase: 0, progress: 0, hearts: 3, wordIdx: 0, matchSelected: null };
 
 function openLesson(level, index) {
+    const done = countLevelLessons(userData, level);
+    if (!isLevelAccessible(level) || index > done) {
+        showXPToast('🔒 Bu dars hali ochilmagan');
+        return;
+    }
     currentLesson = {
         level, index,
         words: [...WORD_BANK[level][index]],
@@ -1162,6 +1185,16 @@ function completeLesson() {
     const levelDone = Object.keys(userData.lessonsCompleted).filter(k => k.startsWith(level + '_')).length >= total;
     const nextLevel = LEVELS[LEVELS.indexOf(level) + 1];
 
+    // Daraja tugasa — keyingi darajaga o'tkazamiz
+    if (levelDone && nextLevel && level === userData.level) {
+        userData.level = nextLevel;
+        saveData();
+        const sel = document.getElementById('level-selector');
+        if (sel) sel.value = nextLevel;
+        pingBackend();
+    }
+    updateLevelSelector();
+
     document.getElementById('modal-content-area').innerHTML = `
         <div class="game-complete">
             <div class="complete-circle">🏆</div>
@@ -1170,7 +1203,7 @@ function completeLesson() {
             <p style="color:var(--text-muted);margin:8px 0">${mistakeCount === 0 ? 'Xatosiz bajarildi!' : `${mistakeCount} ta xato bilan bajarildi`}</p>
             <div style="background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:12px;padding:16px;margin:16px 0">
                 <div style="color:var(--neon-green);font-size:24px;font-weight:700">+${firstTime ? 110 : 10} XP</div>
-                <div style="color:var(--text-muted);font-size:12px">${levelDone ? (nextLevel ? `${level} darajasi tugadi! Keyingisi: ${nextLevel}` : 'Barcha darajalar tugadi! 🎉') : hasNext ? 'Keyingi dars ochildi!' : ''}</div>
+                <div style="color:var(--text-muted);font-size:12px">${levelDone ? (nextLevel ? `🎉 ${level} darajasi tugadi! Endi ${nextLevel} darajasi ochildi` : 'Barcha darajalar tugadi! 🎉') : hasNext ? 'Keyingi dars ochildi!' : ''}</div>
             </div>
             ${hasNext ? `<button class="btn-main" onclick="openLesson('${level}', ${index + 1})"><i class="fas fa-arrow-right me-2"></i> Keyingi dars</button>` : ''}
             <button class="btn-outline-cancel mt-3 w-100" onclick="closeLesson(); renderLessons(); updateHomeUI();">Darslar ro'yxati</button>
@@ -1321,7 +1354,7 @@ function renderProfile() {
         const pct = Math.round((done / total) * 100);
         return `<div class="level-progress-item">
             <div class="level-progress-label">
-                <span>${lvl}</span>
+                <span>${isLevelAccessible(lvl) ? '' : '🔒 '}${lvl}</span>
                 <span style="color:${levelColors[i]}">${done}/${total} dars</span>
             </div>
             <div class="level-bar-track">
@@ -1374,6 +1407,7 @@ function initApp() {
     // Set level selector to user's level
     const selector = document.getElementById('level-selector');
     if (selector && userData.level) selector.value = userData.level;
+    updateLevelSelector();
 
     checkAndAwardBadges();
     pingBackend();

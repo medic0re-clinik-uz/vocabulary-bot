@@ -107,3 +107,23 @@ test('eslatma: bot bloklangan (403) bo\'lsa, eslatmalar o\'chiriladi', async () 
     await runReminderTick({ User, bot, now: new Date('2026-10-18T15:00:00+05:00'), log: () => {} });
     assert.strictEqual(User.docs[0].notifications, false);
 });
+
+test('makeTicker: 4 daqiqada bir martadan ko\'p ishlamaydi, force bilan ishlaydi', async () => {
+    const { makeTicker } = require('../server');
+    const User = new FakeUser(); const bot = fakeBot();
+    User.docs.push({ _id: 1, userId: 9, notifications: true, sentSlots: [], inactiveStage: 0, lastActiveAt: new Date(Date.now() - 30 * 3600000) });
+    const tick = makeTicker({ User, bot, isDbReady: () => true, log: () => {} });
+    assert.strictEqual(await tick(), true);
+    assert.strictEqual(await tick(), false);     // darhol qayta — o'tkazib yuboriladi
+    assert.strictEqual(await tick(true), true);  // force — ishlaydi
+    assert.strictEqual(await makeTicker({ User, bot, isDbReady: () => false })(), false);
+});
+
+test('/health eslatma tekshiruvini ishga tushiradi (web app ochilmasa ham)', async () => {
+    let called = 0;
+    await withServer(createApp({ User: new FakeUser(), bot: fakeBot(), onTick: () => { called++; } }), async (base) => {
+        const r = await fetch(`${base}/health`).then(x => x.json());
+        assert.strictEqual(r.ok, true);
+        assert.strictEqual(called, 1);
+    });
+});

@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
-const { CONFIG, planReminder } = require('./reminders');
+const { CONFIG, planReminder, buildMessage } = require('./reminders');
 
 // ===================================================================
 //  Sozlamalar (.env faylidan olinadi)
@@ -29,13 +29,18 @@ function webAppButton() {
 // ===================================================================
 //  Ilova (express) — bot va baza tashqaridan beriladi, shuning uchun sinab ko'rish oson
 // ===================================================================
-function createApp({ User, bot, isDbReady = () => true }) {
+function createApp({ User, bot, isDbReady = () => true, onTick = null }) {
     const app = express();
     app.use(cors());           // Netlify / GitHub Pages dan keladigan so'rovlarga ruxsat
     app.use(express.json());
 
     // Render uyg'oq turishi uchun (UptimeRobot shu manzilni tekshiradi)
-    app.get('/health', (req, res) => res.json({ ok: true, db: isDbReady() }));
+    // Har bir so'rov eslatmalarni tekshirishni ham ishga tushiradi (ichkarida 4 daqiqada bir martadan ko'p emas).
+    // Shunday qilib tashqi pinger (UptimeRobot) bo'lsa — web app ochilmasa ham eslatmalar yuboriladi.
+    app.get('/health', (req, res) => {
+        if (onTick) onTick();
+        res.json({ ok: true, db: isDbReady() });
+    });
 
     // Frontend ham shu serverdan berilishi mumkin (ixtiyoriy)
     const frontendDir = path.resolve(__dirname, '../../../frontend');
@@ -44,6 +49,15 @@ function createApp({ User, bot, isDbReady = () => true }) {
     } else {
         app.get('/', (req, res) => res.send('Backend va Bot muvaffaqiyatli ishlamoqda!'));
     }
+
+    // Qo'lda tekshirish: /api/tick?key=TICK_KEY (TICK_KEY .env da berilgan bo'lsa)
+    app.get('/api/tick', async (req, res) => {
+        const key = process.env.TICK_KEY;
+        if (key && req.query.key !== key) return res.status(403).json({ ok: false });
+        if (!onTick) return res.json({ ok: true, ran: false });
+        const ran = await onTick(true);
+        res.json({ ok: true, ran: !!ran });
+    });
 
     // Foydalanuvchi aniq Telegram ichida emas (masalan, mehmon sifatida brauzerda) bo'lsa — jim o'tkazib yuboramiz
     const validId = (id) => Number.isInteger(Number(id)) && Number(id) > 0;
@@ -128,6 +142,20 @@ async function runReminderTick({ User, bot, now = new Date(), log = console.log 
     return sent;
 }
 
+/** Eslatma tekshiruvini 4 daqiqada bir martadan ko'p ishlatmaydigan va bir vaqtda ikki marta yurmaydigan o'ram. */
+function makeTicker({ User, bot, isDbReady, minIntervalMs = 4 * 60000, log = console.log }) {
+    let running = false;
+    let last = 0;
+    return async function tick(force = false) {
+        if (running || !isDbReady()) return false;
+        if (!force && Date.now() - last < minIntervalMs) return false;
+        running = true; last = Date.now();
+        try { await runReminderTick({ User, bot, log }); return true; }
+        catch (e) { console.error('Eslatma tekshiruvida xato:', e.message); return false; }
+        finally { running = false; }
+    };
+}
+
 // ===================================================================
 //  Ishga tushirish
 // ===================================================================
@@ -158,20 +186,30 @@ function main() {
     });
     const User = mongoose.models.User || mongoose.model('User', userSchema);
     const isDbReady = () => mongoose.connection.readyState === 1;
+    let tick = null;   // pastda bot yaratilgandan keyin to'ldiriladi
 
     const mongoUri = process.env.MONGO_URI;
     if (!mongoUri) {
         console.error('MONGO_URI topilmadi (.env faylini tekshiring). Server bazasiz ishlaydi.');
     } else {
-        mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 })
-            .then(async () => {
-                console.log('MongoDB-ga muvaffaqiyatli ulandi');
-                if (ADMIN_ID) {
-                    // Egasi bazada bo'lsin: eslatmalar /start bosilmasa ham hisobga olinadi
-                    await User.updateOne({ userId: ADMIN_ID }, { $setOnInsert: { lastActiveAt: new Date() } }, { upsert: true });
-                }
-            })
-            .catch((err) => console.error('MongoDB ulanishida xato:', err.message));
+        // Ulanish bo'lmasa har 30 soniyada qayta urinadi (avvalgi versiyada bir marta urinardi)
+        const connectDb = () => {
+            mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 })
+                .then(async () => {
+                    console.log('MongoDB-ga muvaffaqiyatli ulandi');
+                    if (ADMIN_ID) {
+                        // Egasi bazada bo'lsin: eslatmalar /start bosilmasa ham hisobga olinadi
+                        await User.updateOne({ userId: ADMIN_ID }, { $setOnInsert: { lastActiveAt: new Date() } }, { upsert: true });
+                    }
+                    // Server uxlab turgan bo'lsa — uyg'ongach o'tkazib yuborilgan eslatmani darhol yuboramiz
+                    setTimeout(() => { if (tick) tick(true); }, 15000);
+                })
+                .catch((err) => {
+                    console.error('MongoDB ulanishida xato:', err.message, '— 30 soniyadan keyin qayta uriniladi');
+                    setTimeout(connectDb, 30000);
+                });
+        };
+        connectDb();
     }
 
     // ---- Bot
@@ -213,28 +251,50 @@ function main() {
             bot.sendMessage(msg.chat.id, value ? '🔔 Eslatmalar yoqildi.' : "🔕 Eslatmalar o'chirildi. Qayta yoqish uchun /on yozing.")
                 .catch(() => {});
         };
+        bot.setMyCommands([
+            { command: 'start', description: 'Botni boshlash' },
+            { command: 'on', description: 'Eslatmalarni yoqish' },
+            { command: 'off', description: "Eslatmalarni o'chirish" },
+            { command: 'test', description: 'Namuna eslatma yuborish' },
+            { command: 'status', description: 'Holatni ko\'rish' },
+        ]).catch(() => {});
+
+        // /test — eslatmalar ishlayotganini darhol tekshirish
+        bot.onText(/^\/test\b/, async (msg) => {
+            await registerUser(msg);
+            const text = buildMessage('morning', { firstName: msg.from && msg.from.first_name, streak: 0 });
+            bot.sendMessage(msg.chat.id, '🧪 Sinov eslatmasi:\n\n' + text, webAppButton()).catch(() => {});
+        });
+
+        // /status — eslatmalar sozlamasi va oxirgi faollik
+        bot.onText(/^\/status\b/, async (msg) => {
+            let line = 'Baza ulanmagan.';
+            if (isDbReady() && msg.from) {
+                const u = await User.findOne({ userId: msg.from.id }).lean().catch(() => null);
+                if (u) {
+                    const hrs = u.lastActiveAt ? Math.round((Date.now() - new Date(u.lastActiveAt).getTime()) / 3600000) : '?';
+                    line = `Eslatmalar: ${u.notifications === false ? "o'chiq" : 'yoqilgan'}\nOxirgi kirish: ${hrs} soat oldin\nDaraja: ${u.level || '—'}, streak: ${u.streak || 0}`;
+                } else line = "Siz hali bazada yo'qsiz. /start bosing.";
+            }
+            bot.sendMessage(msg.chat.id, '📊 ' + line).catch(() => {});
+        });
+
         bot.onText(/^\/on\b/, setNotifications(true));
         bot.onText(/^\/off\b/, setNotifications(false));
     }
 
     // ---- Server
-    const app = createApp({ User, bot, isDbReady });
+    tick = (bot && process.env.DISABLE_REMINDERS !== '1') ? makeTicker({ User, bot, isDbReady }) : null;
+    const app = createApp({ User, bot, isDbReady, onTick: tick });
     app.listen(PORT, '0.0.0.0', () => console.log(`Server ${PORT}-portda ishlamoqda...`));
 
     // ---- Eslatmalar: har 5 daqiqada tekshiradi (vaqt mintaqasi: CONFIG.timezone)
     if (bot && process.env.DISABLE_REMINDERS !== '1') {
-        let running = false;
-        cron.schedule('*/5 * * * *', async () => {
-            if (running || !isDbReady()) return;
-            running = true;
-            try { await runReminderTick({ User, bot }); }
-            catch (e) { console.error('Eslatma tekshiruvida xato:', e.message); }
-            finally { running = false; }
-        }, { timezone: CONFIG.timezone });
+        cron.schedule('*/5 * * * *', () => { tick(true); }, { timezone: CONFIG.timezone });
         console.log(`Eslatmalar yoqilgan (vaqt mintaqasi: ${CONFIG.timezone})`);
     }
 }
 
 if (require.main === module) main();
 
-module.exports = { createApp, runReminderTick };
+module.exports = { createApp, runReminderTick, makeTicker };

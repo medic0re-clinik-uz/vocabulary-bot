@@ -52,3 +52,9 @@ Telegram Web App faqat HTTPS manzilda ochiladi, shuning uchun serverni Render'ga
 
 `frontend/words.js` da har daraja — mavzuli darslar ro'yxati, har darsda aynan 10 ta `{ en, uz }`.
 Yangi dars qo'shsangiz, saytda avtomatik chiqadi.
+
+## Yangiliklar
+- Har daraja (A1–C2) uchun 50 ta dars, jami 3000 ta so'z.
+- Faqat joriy daraja ochiq; daraja tugagach keyingisiga avtomatik o'tiladi.
+- Eslatmalar web app ochilmasa ham keladi: `/health` manzilini UptimeRobot har 5 daqiqada chaqirishi kerak (Render bepul tarifi 15 daqiqada uxlab qoladi).
+- Bot buyruqlari: `/test` (namuna eslatma), `/status`, `/on`, `/off`.
